@@ -1,0 +1,21 @@
+# Java
+*.class
+*.log
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# NetBeans
+nbproject/private/
+
+# Build
+out/
+target/
+
+# OS
+.DS_Store
+
