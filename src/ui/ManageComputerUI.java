@@ -1,4 +1,5 @@
 package ui;
+
 import model.Computer;
 import model.Customer;
 import controller.ComputerControl;
@@ -12,7 +13,7 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.sql.*;
 
-public class ManageComputerUI extends JFrame{
+public class ManageComputerUI extends JFrame {
     private JTable tbeMay;
     private Connection conn;
     private ComputerControl computerControl;
@@ -21,7 +22,7 @@ public class ManageComputerUI extends JFrame{
 
     public ManageComputerUI() {
         setTitle("Quản lý máy");
-        setSize(700,400);
+        setSize(700, 400);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
@@ -65,7 +66,7 @@ public class ManageComputerUI extends JFrame{
 
         itemService.addActionListener(e -> {
             try {
-                new ServiceUI().setVisible(true); 
+                new ServiceUI().setVisible(true);
                 this.dispose();
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, "Lỗi mở giao diện dịch vụ: " + ex.getMessage());
@@ -81,7 +82,7 @@ public class ManageComputerUI extends JFrame{
         JPanel panelImage = new JPanel(new GridLayout(2, 5, 10, 10));
         panelImage.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // Đường dẫn ảnh trong resources 
+        // Đường dẫn ảnh trong resources
         String[] imagePaths = {
                 "/images/computer-icon.jpg", "/images/computer-icon.jpg",
                 "/images/computer-icon.jpg", "/images/computer-icon.jpg",
@@ -95,7 +96,8 @@ public class ManageComputerUI extends JFrame{
         for (String path : imagePaths) {
             try {
                 java.net.URL imgUrl = getClass().getResource(path);
-                if (imgUrl == null) throw new Exception("Không tìm thấy ảnh: " + path);
+                if (imgUrl == null)
+                    throw new Exception("Không tìm thấy ảnh: " + path);
                 ImageIcon originalIcon = new ImageIcon(imgUrl);
                 Image img = originalIcon.getImage();
                 Image scaledImg = img.getScaledInstance(width, height, Image.SCALE_SMOOTH);
@@ -135,16 +137,18 @@ public class ManageComputerUI extends JFrame{
         }
 
         add(new JScrollPane(tbeMay), BorderLayout.CENTER);
-        
+
         // Panel nút
         JPanel panelBtn = new JPanel();
 
         JButton btnReload = new JButton("Làm mới");
         JButton btnBaoTri = new JButton("Bảo trì");
+        JButton btnMoMay = new JButton("Mở máy");
         JButton btnStart = new JButton("Bắt đầu chơi");
 
         panelBtn.add(btnReload);
         panelBtn.add(btnBaoTri);
+        panelBtn.add(btnMoMay);
         panelBtn.add(btnStart);
 
         add(panelBtn, BorderLayout.SOUTH);
@@ -152,18 +156,26 @@ public class ManageComputerUI extends JFrame{
         // Sự kiện
         btnReload.addActionListener(e -> loadData());
         btnBaoTri.addActionListener(e -> doiTrangThai("bao_tri"));
+        btnMoMay.addActionListener(e -> doiTrangThai("trong"));
 
         btnStart.addActionListener(e -> {
             int row = tbeMay.getSelectedRow();
-            if(row == -1) {
+            if (row == -1) {
                 JOptionPane.showMessageDialog(this, "Vui lòng chọn máy");
                 return;
             }
-        
+
             int modelRow = tbeMay.convertRowIndexToModel(row);
             Object idMayObj = tableModelComputer.getValueAt(modelRow, 0);
             if (idMayObj == null) {
                 JOptionPane.showMessageDialog(this, "Không lấy được ID máy, hãy tải lại danh sách.");
+                return;
+            }
+
+            // [NEW] Check maintenance in UI
+            Object statusObj = tableModelComputer.getValueAt(modelRow, 4); // "Trạng thái" column
+            if (statusObj != null && "Bảo trì".equals(statusObj.toString())) {
+                JOptionPane.showMessageDialog(this, "Máy đang bảo trì, không thể sử dụng!");
                 return;
             }
 
@@ -174,12 +186,12 @@ public class ManageComputerUI extends JFrame{
                 JOptionPane.showMessageDialog(this, "ID máy không hợp lệ: " + idMayObj);
                 return;
             }
-        
+
             // Mở LoginDialog modal để khách đăng nhập
             LoginDialog loginDialog = new LoginDialog(this, conn); // "this" là parent
             loginDialog.setModal(true);
             loginDialog.setVisible(true);
-        
+
             // Lấy khách sau khi dialog đóng
             Customer customer = loginDialog.getLoggedCustomer();
             if (customer == null) {
@@ -193,17 +205,18 @@ public class ManageComputerUI extends JFrame{
                 // Bắt đầu session cho khách
                 Session dangChoi = sessionControl.startSession(conn, idMay, idKhach);
 
-                if(dangChoi != null) {
+                if (dangChoi != null) {
                     // Cập nhật trạng thái máy
                     computerControl.updateTrangThai(conn, idMay, "dang_su_dung");
                     loadData();
-                
+
                     // Tạo MainController và MainFrame khách ngay lập tức
                     MainController mainController = new MainController(conn, customer);
                     MainFrame mainFrame = new MainFrame(mainController);
                     mainFrame.setVisible(true); // hiển thị MainFrame khách
-                
-                    JOptionPane.showMessageDialog(this, "Khách " + customer.getUserName() + " đã đăng nhập và bắt đầu phiên chơi.");
+
+                    JOptionPane.showMessageDialog(this,
+                            "Khách " + customer.getUserName() + " đã đăng nhập và bắt đầu phiên chơi.");
                 } else {
                     JOptionPane.showMessageDialog(this, "Máy đã có khách!");
                 }
@@ -222,11 +235,11 @@ public class ManageComputerUI extends JFrame{
 
             for (Computer c : computerControl.getAll()) {
                 tableModelComputer.addRow(new Object[] {
-                    c.getIdMay(),
-                    c.getTenMay(),
-                    c.getLoaiMay(),
-                    c.getGiaGio(),
-                    c.getTrangThaiHienThi()
+                        c.getIdMay(),
+                        c.getTenMay(),
+                        c.getLoaiMay(),
+                        c.getGiaGio(),
+                        c.getTrangThaiHienThi()
                 });
             }
         } catch (Exception ex) {
@@ -258,6 +271,18 @@ public class ManageComputerUI extends JFrame{
         }
 
         try {
+            Computer c = computerControl.findById(conn, idMay);
+            if (c == null) {
+                JOptionPane.showMessageDialog(this, "Không tìm thấy thông tin máy!");
+                return;
+            }
+
+            // Fix lỗi: Đang chơi thì không được bảo trì
+            if ("bao_tri".equals(trangThaiMoi) && c.isDangSuDung()) {
+                JOptionPane.showMessageDialog(this, "Máy đang có khách, không thể bảo trì!");
+                return;
+            }
+
             computerControl.updateTrangThai(conn, idMay, trangThaiMoi);
             loadData();
         } catch (Exception ex) {

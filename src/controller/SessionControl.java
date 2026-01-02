@@ -1,4 +1,5 @@
 package controller;
+
 import dao.SessionDAO;
 import model.Session;
 import model.Computer;
@@ -29,12 +30,39 @@ public class SessionControl {
 
     // Bắt đầu phiên chơi
     public Session startSession(Connection conn, int idMay, int idKhach) throws SQLException {
+        // Kiểm tra xem máy có đang online (đang có session chưa kết thúc) không?
+        Session activeSession = sessionDAO.findDangChoiByMay(conn, idMay);
+        if (activeSession != null) {
+            // Kiểm tra trạng thái thực của máy trong bảng COMPUTER
+            // Nếu máy ghi là "trống" hoặc "bảo trì" mà lại có session active -> Session ma
+            // (zombie).
+            // Ta sẽ đóng session đó lại và cho khách mới chơi.
+            dao.ComputerDAO computerDAO = new dao.ComputerDAO();
+            Computer may = computerDAO.findById(conn, idMay);
+
+            if (may != null && may.isDangSuDung()) {
+                // Máy thực sự đang có người chơi -> Block
+                return null;
+            } else {
+                // Session cũ bị lỗi không đóng -> Tự động đóng
+                activeSession.setGioKetThuc(LocalDateTime.now());
+                sessionDAO.update(conn, activeSession);
+            }
+        }
+
+        // [NEW] Check Maintenance explicit in DB to be safe
+        dao.ComputerDAO computerDAO = new dao.ComputerDAO();
+        Computer may = computerDAO.findById(conn, idMay);
+        if (may != null && "bao_tri".equalsIgnoreCase(may.getTrangThai())) {
+            return null; // Block start session if maintenance
+        }
+
         Session phien = new Session(
-            0, idMay, idKhach, LocalDateTime.now(), null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO
-        );
+                0, idMay, idKhach, LocalDateTime.now(), null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
 
         int newId = sessionDAO.insert(conn, phien);
-        if(newId <= 0) return null;
+        if (newId <= 0)
+            return null;
 
         phien.setIdPhien(newId);
         dsPhien.add(phien);
@@ -49,11 +77,13 @@ public class SessionControl {
 
         // Tính tiền giờ
         long minutes = Duration.between(phien.getGioBatDau(), endTime).toMinutes();
-        if(minutes <= 0) minutes = 1;
-        BigDecimal tienGio = giaGio.multiply(BigDecimal.valueOf(minutes)).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+        if (minutes <= 0)
+            minutes = 1;
+        BigDecimal tienGio = giaGio.multiply(BigDecimal.valueOf(minutes)).divide(BigDecimal.valueOf(60), 2,
+                RoundingMode.HALF_UP);
         phien.setTienGio(tienGio);
         phien.tinhTongTien();
-        
+
         return sessionDAO.update(conn, phien);
     }
 
@@ -67,6 +97,7 @@ public class SessionControl {
     public Session findDangChoiByMay(Connection conn, int idMay) throws SQLException {
         return sessionDAO.findDangChoiByMay(conn, idMay);
     }
+
     public Session findDangChoiByKhach(Connection conn, int idKhach) throws SQLException {
         return sessionDAO.findDangChoiByKhach(conn, idKhach);
     }
