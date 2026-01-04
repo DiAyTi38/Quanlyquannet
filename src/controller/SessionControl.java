@@ -57,6 +57,11 @@ public class SessionControl {
             return null; // Block start session if maintenance
         }
 
+        // Kiểm tra xem khách hàng có đang chơi ở máy khác không?
+        if (sessionDAO.findDangChoiByKhach(conn, idKhach) != null) {
+            throw new IllegalStateException("Khách hàng đang sử dụng một máy khác!");
+        }
+
         Session phien = new Session(
                 0, idMay, idKhach, LocalDateTime.now(), null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
 
