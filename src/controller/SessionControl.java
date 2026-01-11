@@ -58,8 +58,20 @@ public class SessionControl {
         }
 
         // Kiểm tra xem khách hàng có đang chơi ở máy khác không?
-        if (sessionDAO.findDangChoiByKhach(conn, idKhach) != null) {
-            throw new IllegalStateException("Khách hàng đang sử dụng một máy khác!");
+        Session otherSession = sessionDAO.findDangChoiByKhach(conn, idKhach);
+        if (otherSession != null) {
+            // Nếu tìm thấy session, kiểm tra xem máy đó có đang thực sự sử dụng không?
+            dao.ComputerDAO otherComputerDAO = new dao.ComputerDAO();
+            Computer otherMachine = otherComputerDAO.findById(conn, otherSession.getIdMay());
+
+            if (otherMachine != null && otherMachine.isDangSuDung()) {
+                throw new IllegalStateException(
+                        "Khách hàng đang sử dụng một máy khác (Máy " + otherMachine.getTenMay() + ")!");
+            } else {
+                // Máy kia không đang sử dụng -> Session ảo (zombie) -> Đóng nó lại
+                otherSession.setGioKetThuc(LocalDateTime.now());
+                sessionDAO.update(conn, otherSession);
+            }
         }
 
         Session phien = new Session(
@@ -93,9 +105,10 @@ public class SessionControl {
     }
 
     // Update tiền dịch vụ
-    public void congTienDichVu(Session phien, BigDecimal tienDV) {
+    public void congTienDichVu(Connection conn, Session phien, BigDecimal tienDV) throws SQLException {
         phien.setTienDichVu(phien.getTienDichVu().add(tienDV));
         phien.tinhTongTien();
+        sessionDAO.update(conn, phien);
     }
 
     // Tìm

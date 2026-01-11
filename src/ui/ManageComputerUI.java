@@ -158,6 +158,48 @@ public class ManageComputerUI extends JFrame {
         btnBaoTri.addActionListener(e -> doiTrangThai("bao_tri"));
         btnMoMay.addActionListener(e -> doiTrangThai("trong"));
 
+        // [NEW] Nút Dịch vụ
+        JButton btnDichVu = new JButton("Dịch vụ");
+        panelBtn.add(btnDichVu);
+
+        btnDichVu.addActionListener(e -> {
+            int row = tbeMay.getSelectedRow();
+            if (row == -1) {
+                JOptionPane.showMessageDialog(this, "Vui lòng chọn máy đang sử dụng!");
+                return;
+            }
+
+            int modelRow = tbeMay.convertRowIndexToModel(row);
+            Object idMayObj = tableModelComputer.getValueAt(modelRow, 0);
+            if (idMayObj == null)
+                return;
+
+            try {
+                int idMay = Integer.parseInt(idMayObj.toString());
+
+                // Kiểm tra xem máy có đang online không
+                Computer c = computerControl.findById(conn, idMay);
+                if (c == null || !c.isDangSuDung()) {
+                    JOptionPane.showMessageDialog(this, "Máy này không đang hoạt động!");
+                    return;
+                }
+
+                // Tìm session đang chơi
+                Session currentSession = sessionControl.findDangChoiByMay(conn, idMay);
+                if (currentSession == null) {
+                    JOptionPane.showMessageDialog(this, "Không tìm thấy phiên chơi!");
+                    return;
+                }
+
+                // Mở UI chi tiết dịch vụ
+                new DetailServiceUI(currentSession).setVisible(true);
+
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Lỗi khi mở dịch vụ: " + ex.getMessage());
+            }
+        });
+
         btnStart.addActionListener(e -> {
             int row = tbeMay.getSelectedRow();
             if (row == -1) {

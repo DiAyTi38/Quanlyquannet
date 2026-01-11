@@ -16,8 +16,8 @@ import util.connectdb;
 
 public class DetailServiceUI extends JFrame {
 
-    private JTable tableService;       // danh sách dịch vụ
-    private JTable tableDetail;        // chi tiết dịch vụ của phiên
+    private JTable tableService; // danh sách dịch vụ
+    private JTable tableDetail; // chi tiết dịch vụ của phiên
     private DefaultTableModel tableModelService;
     private DefaultTableModel tableModelDetail;
     private JButton btnAddService, btnRemoveService;
@@ -36,7 +36,17 @@ public class DetailServiceUI extends JFrame {
         currentSession = session;
         connectDB();
         serviceControl = new ServiceControl();
-        detailServiceControl = new DetailServiceControl(serviceControl);
+        // SessionControl để cập nhật tiền
+        controller.SessionControl sessionControl = new controller.SessionControl();
+        detailServiceControl = new DetailServiceControl(serviceControl, sessionControl);
+
+        try {
+            serviceControl.loadAll(conn);
+            detailServiceControl.loadAll(conn);
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Lỗi tải dữ liệu dịch vụ!");
+        }
 
         initUI();
         loadData();
@@ -59,19 +69,21 @@ public class DetailServiceUI extends JFrame {
         panelTables.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         // Bảng danh sách dịch vụ
-        String[] colsService = {"ID", "Tên dịch vụ", "Giá"};
+        String[] colsService = { "ID", "Tên dịch vụ", "Giá" };
         tableModelService = new DefaultTableModel(colsService, 0);
         tableService = new JTable(tableModelService);
-        //!!! Quan trọng: Không nên ẩn cột ID khi cần lấy giá trị ID từ TableModel !!!
-        // tableService.removeColumn(tableService.getColumnModel().getColumn(0)); // ẩn cột ID
+        // !!! Quan trọng: Không nên ẩn cột ID khi cần lấy giá trị ID từ TableModel !!!
+        // tableService.removeColumn(tableService.getColumnModel().getColumn(0)); // ẩn
+        // cột ID
         panelTables.add(new JScrollPane(tableService));
 
         // Bảng chi tiết dịch vụ của phiên
-        String[] colsDetail = {"ID", "Tên dịch vụ", "Số lượng"};
+        String[] colsDetail = { "ID CTDV", "Tên dịch vụ", "Số lượng" };
         tableModelDetail = new DefaultTableModel(colsDetail, 0);
         tableDetail = new JTable(tableModelDetail);
-        //!!! Quan trọng: Không nên ẩn cột ID khi cần lấy giá trị ID từ TableModel !!!
-        // tableDetail.removeColumn(tableDetail.getColumnModel().getColumn(0)); // ẩn cột ID
+        // !!! Quan trọng: Không nên ẩn cột ID khi cần lấy giá trị ID từ TableModel !!!
+        // tableDetail.removeColumn(tableDetail.getColumnModel().getColumn(0)); // ẩn
+        // cột ID
         panelTables.add(new JScrollPane(tableDetail));
 
         add(panelTables, BorderLayout.CENTER);
@@ -107,7 +119,8 @@ public class DetailServiceUI extends JFrame {
             }
 
             String soLuongStr = JOptionPane.showInputDialog(this, "Số lượng:");
-            if (soLuongStr == null) return; // nhấn cancel
+            if (soLuongStr == null)
+                return; // nhấn cancel
 
             try {
                 int soLuong = Integer.parseInt(soLuongStr);
@@ -124,7 +137,7 @@ public class DetailServiceUI extends JFrame {
                 JOptionPane.showMessageDialog(this, "Số lượng không hợp lệ!");
             } catch (SQLException ex) {
                 ex.printStackTrace();
-                JOptionPane.showMessageDialog(this, "Lỗi khi thêm dịch vụ!");
+                JOptionPane.showMessageDialog(this, "Lỗi khi thêm dịch vụ!" + ex.getMessage());
             }
         });
 
@@ -151,7 +164,8 @@ public class DetailServiceUI extends JFrame {
             }
 
             try {
-                detailServiceControl.removeServiceFromSession(conn, currentSession, idDv);
+                detailServiceControl.removeServiceFromSession(conn, currentSession, idDv); // idDv ở đây thực chất là
+                                                                                           // idCtdv
                 loadData();
                 JOptionPane.showMessageDialog(this, "Xóa dịch vụ thành công!");
             } catch (SQLException ex) {
@@ -171,7 +185,7 @@ public class DetailServiceUI extends JFrame {
             List<Service> dsService = serviceControl.getAll();
             for (Service sv : dsService) {
                 // Giữ lại ID để các thao tác thêm/select không lỗi vì mất ID
-                tableModelService.addRow(new Object[]{
+                tableModelService.addRow(new Object[] {
                         sv.getIdDv(), sv.getTenDv(), sv.getGia()
                 });
             }
@@ -184,8 +198,8 @@ public class DetailServiceUI extends JFrame {
                 Service dv = detailServiceControl.getServiceControl().findById(d.getIdDv());
                 String tenDv = (dv != null) ? dv.getTenDv() : "Unknown";
 
-                // Thêm cả idDv để khi xóa không bị lỗi không lấy được ID
-                tableModelDetail.addRow(new Object[]{d.getIdDv(), tenDv, d.getSoLuong()});
+                // Thêm idCtdv vào cột 0 thay vì idDv
+                tableModelDetail.addRow(new Object[] { d.getIdCtdv(), tenDv, d.getSoLuong() });
             }
         } catch (Exception ex) {
             ex.printStackTrace();

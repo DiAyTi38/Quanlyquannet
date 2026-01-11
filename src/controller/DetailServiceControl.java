@@ -1,4 +1,5 @@
 package controller;
+
 import model.DetailService;
 import dao.DetailServiceDAO;
 import model.Session;
@@ -6,18 +7,19 @@ import model.Service;
 
 import java.sql.*;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.math.BigDecimal;
 
 public class DetailServiceControl {
     private final DetailServiceDAO ctdvDAO;
     private final ServiceControl serviceControl;
+    private final SessionControl sessionControl;
     private final ArrayList<DetailService> dsCTDV;
 
-    public DetailServiceControl(ServiceControl serviceControl) {
+    public DetailServiceControl(ServiceControl serviceControl, SessionControl sessionControl) {
         this.ctdvDAO = new DetailServiceDAO();
         this.dsCTDV = new ArrayList<>();
         this.serviceControl = serviceControl;
+        this.sessionControl = sessionControl;
     }
 
     // Load
@@ -29,6 +31,7 @@ public class DetailServiceControl {
     public ServiceControl getServiceControl() {
         return serviceControl;
     }
+
     // Lọc danh sách chi tiết dịch vụ theo phiên chơi cụ thể
     public ArrayList<DetailService> getServicesBySession(Session phien) {
         ArrayList<DetailService> ds = new ArrayList<>();
@@ -40,33 +43,35 @@ public class DetailServiceControl {
         return ds;
     }
 
-
     public ArrayList<DetailService> getAll() {
         return dsCTDV;
     }
 
     // thêm dịch vụ vào phiên
     public BigDecimal addServiceToSession(
-        Connection conn, Session phien, Service dv, int soLuong
-    ) throws SQLException {
+            Connection conn, Session phien, Service dv, int soLuong) throws SQLException {
         // Lưu chi tiết dịch vụ
         DetailService ctdv = new DetailService(
-            0, phien.getIdPhien(), dv.getIdDv(), soLuong
-        );
+                0, phien.getIdPhien(), dv.getIdDv(), soLuong);
 
         int newId = ctdvDAO.insert(conn, ctdv);
-        if (newId <= 0) return BigDecimal.ZERO;
+        if (newId <= 0)
+            return BigDecimal.ZERO;
 
         ctdv.setIdCtdv(newId);
         dsCTDV.add(ctdv);
 
         // Tính tiền dịch vụ
-        return dv.getGia().multiply(BigDecimal.valueOf(soLuong));
+        BigDecimal tongTien = dv.getGia().multiply(BigDecimal.valueOf(soLuong));
+
+        // Cập nhật session
+        sessionControl.congTienDichVu(conn, phien, tongTien);
+
+        return tongTien;
     }
 
     public BigDecimal addServiceToSession(
-        Connection conn, Session phien, int idDv, int soLuong
-        ) throws SQLException {
+            Connection conn, Session phien, int idDv, int soLuong) throws SQLException {
 
         Service dv = serviceControl.findById(idDv);
         if (dv == null) {
@@ -76,17 +81,31 @@ public class DetailServiceControl {
         return addServiceToSession(conn, phien, dv, soLuong);
     }
 
-    public boolean removeServiceFromSession(Connection conn, Session phien, int idDv) throws SQLException {
-        boolean ok = ctdvDAO.delete(conn, phien.getIdPhien(), idDv);
+    // Fix: Xoá theo idCtdv (để chính xác record) và trừ tiền
+    public boolean removeServiceFromSession(Connection conn, Session phien, int idCtdv) throws SQLException {
+        // Tìm record trong memory để biết giá tiền mà trừ
+        DetailService target = null;
+        for (DetailService d : dsCTDV) {
+            if (d.getIdCtdv() == idCtdv && d.getIdPhien() == phien.getIdPhien()) {
+                target = d;
+                break;
+            }
+        }
+
+        if (target == null)
+            return false;
+
+        // Xoá DB
+        boolean ok = ctdvDAO.delete(conn, phien.getIdPhien(), idCtdv);
 
         if (ok) {
-            // Cập nhật dsCTDV trong bộ nhớ
-            Iterator<DetailService> iter = dsCTDV.iterator();
-            while (iter.hasNext()) {
-                DetailService d = iter.next();
-                if (d.getIdPhien() == phien.getIdPhien() && d.getIdDv() == idDv) {
-                    iter.remove();
-                }
+            dsCTDV.remove(target);
+
+            // Trừ tiền
+            Service dv = serviceControl.findById(target.getIdDv());
+            if (dv != null) {
+                BigDecimal tien = dv.getGia().multiply(BigDecimal.valueOf(target.getSoLuong()));
+                sessionControl.congTienDichVu(conn, phien, tien.negate());
             }
         }
 
